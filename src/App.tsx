@@ -1,14 +1,12 @@
 import React from 'react';
 import './App.css';
-import { BlockedProcessChecker } from "./BlockedProcessChecker";
-import { HeicConverter } from './workers/HeicWorker';
-import { spawn, Worker } from "threads"
+import {BlockedProcessChecker} from "./BlockedProcessChecker";
 
+const convert = require("heic-convert");
 
 export class App extends React.Component {
     protected fileInputRef: HTMLInputElement | null = null;
     protected imageContainer: HTMLDivElement | null = null;
-    protected freeWorkers: HeicConverter[] = [];
 
     protected onClick = () => {
         const files = this.fileInputRef?.files;
@@ -69,29 +67,48 @@ export class App extends React.Component {
     }
 
     protected processPhoto = async (file: File): Promise<string> => {
-        const worker = await this.getFreeOrCreateNewWorker();
-        const photo = await worker.convert(file);
-        
-        return photo;
+        return new Promise(async (resolve, reject) => {
+            const reader: FileReader = new FileReader();
+
+            reader.onerror = (e) => {
+                reject("reader error");
+            };
+
+            reader.onload = async () => {
+                try {
+                    let arrayBuffer = new Uint8Array(reader.result as any);
+                    const outputBuffer = await convert({
+                        buffer: arrayBuffer,
+                        format: "JPEG",
+                        quality: 1,
+                    });
+
+                    resolve(this.arrayBuffer2Base64(outputBuffer));
+                } catch (e) {
+                    console.log("HEIC WORKER ERROR => ", e);
+                    reject(e);
+                }
+            };
+
+            reader.readAsArrayBuffer(file);
+        });
     }
 
-
-
-    protected getFreeOrCreateNewWorker = async (): Promise<HeicConverter> => {
-        if (this.freeWorkers.length === 0) {
-            return await spawn<HeicConverter>(new Worker("./workers/HeicWorker"))
-        }
-        else return this.freeWorkers.pop() as HeicConverter;
+    protected arrayBuffer2Base64 = (arrayBuffer: ArrayBuffer) => {
+        return btoa(
+            new Uint8Array(arrayBuffer)
+                .reduce((data, byte) => data + String.fromCharCode(byte), '')
+        );
     }
 
 
     render() {
         return (
             <div className="App">
-                <input type="file" multiple={true} ref={(ref) => this.fileInputRef = ref} />
+                <input type="file" multiple={true} ref={(ref) => this.fileInputRef = ref}/>
                 <button onClick={this.onClick}>Konwertuj pliki HEIC!
                 </button>
-                <BlockedProcessChecker />
+                <BlockedProcessChecker/>
 
                 <div className={"imageContainer"} ref={(ref) => this.imageContainer = ref}></div>
             </div>
