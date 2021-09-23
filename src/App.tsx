@@ -1,8 +1,7 @@
 import React from 'react';
 import './App.css';
 import {BlockedProcessChecker} from "./BlockedProcessChecker";
-
-const convert = require("heic-convert");
+import {HeicConverterUtil} from "./HeicConverterUtil";
 
 export class App extends React.Component {
     protected fileInputRef: HTMLInputElement | null = null;
@@ -27,8 +26,7 @@ export class App extends React.Component {
     protected processPhotos = async (files: FileList) => {
         for (const file of files) {
             try {
-                const photo = await this.processPhoto(file)
-
+                const photo = await HeicConverterUtil.processPhoto(file)
                 this.createImage(photo)
             } catch {
                 console.warn(`Photo: ${file.name} is not available.`)
@@ -66,43 +64,7 @@ export class App extends React.Component {
         this.imageContainer.appendChild(image)
     }
 
-    protected processPhoto = async (file: File): Promise<string> => {
-        return new Promise(async (resolve, reject) => {
-            const reader: FileReader = new FileReader();
-
-            reader.onerror = (e) => {
-                reject("reader error");
-            };
-
-            reader.onload = async () => {
-                try {
-                    let arrayBuffer = new Uint8Array(reader.result as any);
-                    const outputBuffer = await convert({
-                        buffer: arrayBuffer,
-                        format: "JPEG",
-                        quality: 1,
-                    });
-
-                    resolve(this.arrayBuffer2Base64(outputBuffer));
-                } catch (e) {
-                    console.log("HEIC WORKER ERROR => ", e);
-                    reject(e);
-                }
-            };
-
-            reader.readAsArrayBuffer(file);
-        });
-    }
-
-    protected arrayBuffer2Base64 = (arrayBuffer: ArrayBuffer) => {
-        return btoa(
-            new Uint8Array(arrayBuffer)
-                .reduce((data, byte) => data + String.fromCharCode(byte), '')
-        );
-    }
-
-
-    render() {
+    public render() {
         return (
             <div className="App">
                 <input type="file" multiple={true} ref={(ref) => this.fileInputRef = ref}/>
